@@ -1,0 +1,9 @@
+﻿{
+  "name": "APOD",
+  "short_name": "APOD",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#0B1020",
+  "theme_color": "#0B1020",
+  "description": "NASA Astronomy Picture of the Day"
+}

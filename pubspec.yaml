@@ -1,0 +1,29 @@
+﻿name: apod_app
+description: NASA APOD viewer (Flutter web + mobile).
+publish_to: "none"
+version: 0.1.0
+
+environment:
+  sdk: ">=3.3.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  http: ^1.2.2
+  intl: ^0.19.0
+  youtube_player_iframe: ^5.2.1
+  flutter_native_splash: ^2.4.6
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/
+flutter_native_splash:
+  color: "#0B1023"
+  image: assets/images/splash_logo.png
+
+  android_12:
+    image: assets/images/splash_logo.png
+    color: "#0B1023"
+
+  web: true
