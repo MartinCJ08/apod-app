@@ -150,6 +150,21 @@ class _ApodHomePageState extends State<ApodHomePage> {
     await _loadApod(parsedDate);
   }
 
+  Future<void> _openSavedApodsScreen() async {
+    final ApodData? selectedApod = await Navigator.push<ApodData>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => SavedApodsPage(
+          savedApods: _savedApods,
+          currentApodDate: _apod?.date,
+        ),
+      ),
+    );
+
+    if (selectedApod == null) return;
+    await _openSavedApod(selectedApod);
+  }
+
   Future<void> _loadApod([DateTime? date]) async {
     setState(() {
       _isLoading = true;
@@ -227,6 +242,11 @@ class _ApodHomePageState extends State<ApodHomePage> {
             icon: const Icon(Icons.casino),
           ),
           IconButton(
+            onPressed: _openSavedApodsScreen,
+            tooltip: 'Saved APODs',
+            icon: const Icon(Icons.bookmarks),
+          ),
+          IconButton(
             onPressed: _isLoading ? null : _loadApod,
             tooltip: 'Refresh',
             icon: const Icon(Icons.refresh),
@@ -246,8 +266,6 @@ class _ApodHomePageState extends State<ApodHomePage> {
                       useHd: _useHd,
                       isSaved: _isCurrentDaySaved,
                       onToggleSave: _toggleSaveCurrentDay,
-                      savedApods: _savedApods,
-                      onOpenSavedApod: _openSavedApod,
                       onToggleHd: (value) {
                         setState(() {
                           _useHd = value;
@@ -266,8 +284,6 @@ class _ApodDetailView extends StatelessWidget {
     required this.useHd,
     required this.isSaved,
     required this.onToggleSave,
-    required this.savedApods,
-    required this.onOpenSavedApod,
     required this.onToggleHd,
   });
 
@@ -277,8 +293,6 @@ class _ApodDetailView extends StatelessWidget {
   final bool useHd;
   final bool isSaved;
   final Future<void> Function() onToggleSave;
-  final List<ApodData> savedApods;
-  final Future<void> Function(ApodData savedApod) onOpenSavedApod;
   final ValueChanged<bool> onToggleHd;
 
   @override
@@ -300,8 +314,6 @@ class _ApodDetailView extends StatelessWidget {
           useHd: useHd,
           isSaved: isSaved,
           onToggleSave: onToggleSave,
-          savedApods: savedApods,
-          onOpenSavedApod: onOpenSavedApod,
           onToggleHd: onToggleHd,
         );
 
@@ -575,8 +587,6 @@ class _DetailsPanel extends StatelessWidget {
     required this.useHd,
     required this.isSaved,
     required this.onToggleSave,
-    required this.savedApods,
-    required this.onOpenSavedApod,
     required this.onToggleHd,
   });
 
@@ -586,8 +596,6 @@ class _DetailsPanel extends StatelessWidget {
   final bool useHd;
   final bool isSaved;
   final Future<void> Function() onToggleSave;
-  final List<ApodData> savedApods;
-  final Future<void> Function(ApodData savedApod) onOpenSavedApod;
   final ValueChanged<bool> onToggleHd;
 
   @override
@@ -646,56 +654,73 @@ class _DetailsPanel extends StatelessWidget {
             apod.explanation,
             style: theme.textTheme.bodyLarge?.copyWith(height: 1.5),
           ),
-          const SizedBox(height: 24),
-          Text(
-            'Saved days',
-            style: theme.textTheme.titleMedium,
-          ),
-          const SizedBox(height: 8),
-          if (savedApods.isEmpty)
-            Text(
-              'No saved days yet.',
-              style: theme.textTheme.bodyMedium,
-            )
-          else
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxHeight: 260),
-              child: ListView.separated(
-                itemCount: savedApods.length,
-                separatorBuilder: (context, index) => const SizedBox(height: 8),
-                itemBuilder: (context, index) {
-                  final ApodData savedApod = savedApods[index];
-                  final DateTime? savedDate = DateTime.tryParse(savedApod.date);
-                  final bool isCurrentDay = savedApod.date == apod.date;
-
-                  return Card(
-                    elevation: 0,
-                    color: isCurrentDay
-                        ? theme.colorScheme.primaryContainer
-                        : theme.colorScheme.surfaceContainerHighest.withOpacity(0.35),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: ListTile(
-                      onTap: () => onOpenSavedApod(savedApod),
-                      title: Text(
-                        savedApod.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      subtitle: Text(
-                        savedDate == null
-                            ? savedApod.date
-                            : DateFormat('MMM d, yyyy').format(savedDate),
-                      ),
-                      trailing: const Icon(Icons.open_in_new),
-                    ),
-                  );
-                },
-              ),
-            ),
         ],
       ),
+    );
+  }
+}
+
+class SavedApodsPage extends StatelessWidget {
+  const SavedApodsPage({
+    super.key,
+    required this.savedApods,
+    required this.currentApodDate,
+  });
+
+  final List<ApodData> savedApods;
+  final String? currentApodDate;
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Saved APODs'),
+      ),
+      body: savedApods.isEmpty
+          ? Center(
+              child: Text(
+                'No saved days yet.',
+                style: theme.textTheme.bodyLarge,
+              ),
+            )
+          : ListView.separated(
+              padding: const EdgeInsets.all(16),
+              itemCount: savedApods.length,
+              separatorBuilder: (context, index) => const SizedBox(height: 8),
+              itemBuilder: (context, index) {
+                final ApodData savedApod = savedApods[index];
+                final DateTime? savedDate = DateTime.tryParse(savedApod.date);
+                final bool isCurrentDay = savedApod.date == currentApodDate;
+
+                return Card(
+                  elevation: 0,
+                  color: isCurrentDay
+                      ? theme.colorScheme.primaryContainer
+                      : theme.colorScheme.surfaceContainerHighest.withOpacity(
+                          0.35,
+                        ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: ListTile(
+                    onTap: () => Navigator.pop(context, savedApod),
+                    title: Text(
+                      savedApod.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    subtitle: Text(
+                      savedDate == null
+                          ? savedApod.date
+                          : DateFormat('MMM d, yyyy').format(savedDate),
+                    ),
+                    trailing: const Icon(Icons.arrow_forward_ios),
+                  ),
+                );
+              },
+            ),
     );
   }
 }
@@ -779,4 +804,3 @@ class ApodData {
     return hdUrl ?? url;
   }
 }
-
