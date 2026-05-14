@@ -1,8 +1,10 @@
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 
 
@@ -34,6 +36,7 @@ class ApodHomePage extends StatefulWidget {
 
 class _ApodHomePageState extends State<ApodHomePage> {
   static const String _apiKey = '';
+  static const String _savedApodsKey = 'saved_apods';
   final DateFormat _dateFormat = DateFormat('yyyy-MM-dd');
 
   ApodData? _apod;
@@ -41,11 +44,110 @@ class _ApodHomePageState extends State<ApodHomePage> {
   String? _error;
   DateTime _selectedDate = DateTime.now();
   bool _useHd = true;
+  List<ApodData> _savedApods = <ApodData>[];
 
   @override
   void initState() {
     super.initState();
-    _loadApod();
+    _initializePage();
+  }
+
+  Future<void> _initializePage() async {
+    await _loadSavedApods();
+    await _loadApod();
+  }
+
+  Future<void> _loadSavedApods() async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    final List<String> rawApods =
+        prefs.getStringList(_savedApodsKey) ?? <String>[];
+    final List<ApodData> parsedApods = rawApods
+        .map((rawApod) {
+          try {
+            final dynamic decoded = jsonDecode(rawApod);
+            if (decoded is Map<String, dynamic>) {
+              return ApodData.fromJson(decoded);
+            }
+            if (decoded is Map) {
+              return ApodData.fromJson(Map<String, dynamic>.from(decoded));
+            }
+            return null;
+          } catch (_) {
+            return null;
+          }
+        })
+        .whereType<ApodData>()
+        .toList();
+
+    parsedApods.sort((a, b) => b.date.compareTo(a.date));
+
+    if (!mounted) return;
+    setState(() {
+      _savedApods = parsedApods;
+    });
+  }
+
+  Future<void> _persistSavedApods() async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    final List<String> serializedApods = _savedApods
+        .map((savedApod) => jsonEncode(savedApod.toJson()))
+        .toList();
+    await prefs.setStringList(_savedApodsKey, serializedApods);
+  }
+
+  bool get _isCurrentDaySaved {
+    final String? apodDate = _apod?.date;
+    if (apodDate == null || apodDate.isEmpty) return false;
+    return _savedApods.any((savedApod) => savedApod.date == apodDate);
+  }
+
+  Future<void> _toggleSaveCurrentDay() async {
+    if (_apod == null) return;
+
+    final ApodData currentApod = _apod!;
+    final bool alreadySaved =
+        _savedApods.any((savedApod) => savedApod.date == currentApod.date);
+
+    setState(() {
+      if (alreadySaved) {
+        _savedApods.removeWhere(
+          (savedApod) => savedApod.date == currentApod.date,
+        );
+      } else {
+        _savedApods.removeWhere(
+          (savedApod) => savedApod.date == currentApod.date,
+        );
+        _savedApods.insert(0, currentApod);
+        _savedApods.sort((a, b) => b.date.compareTo(a.date));
+      }
+    });
+
+    await _persistSavedApods();
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          alreadySaved
+              ? 'Removed ${currentApod.date} from saved days.'
+              : 'Saved ${currentApod.date}.',
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openSavedApod(ApodData savedApod) async {
+    final DateTime? parsedDate = DateTime.tryParse(savedApod.date);
+    if (parsedDate == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not open this saved day due to an invalid date.'),
+        ),
+      );
+      return;
+    }
+    await _loadApod(parsedDate);
   }
 
   Future<void> _loadApod([DateTime? date]) async {
@@ -102,12 +204,28 @@ class _ApodHomePageState extends State<ApodHomePage> {
     }
   }
 
+  Future<void> _loadRandomApod() async {
+    final DateTime firstApodDate = DateTime(1995, 6, 16);
+    final DateTime today = DateTime.now();
+    final int availableDays = today.difference(firstApodDate).inDays;
+    final int randomOffset = Random().nextInt(availableDays + 1);
+    final DateTime randomDate = firstApodDate.add(
+      Duration(days: randomOffset),
+    );
+    await _loadApod(randomDate);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Astronomy Picture of the Day'),
         actions: [
+          IconButton(
+            onPressed: _isLoading ? null : _loadRandomApod,
+            tooltip: 'Random day',
+            icon: const Icon(Icons.casino),
+          ),
           IconButton(
             onPressed: _isLoading ? null : _loadApod,
             tooltip: 'Refresh',
@@ -126,6 +244,10 @@ class _ApodHomePageState extends State<ApodHomePage> {
                       selectedDate: _selectedDate,
                       onPickDate: _pickDate,
                       useHd: _useHd,
+                      isSaved: _isCurrentDaySaved,
+                      onToggleSave: _toggleSaveCurrentDay,
+                      savedApods: _savedApods,
+                      onOpenSavedApod: _openSavedApod,
                       onToggleHd: (value) {
                         setState(() {
                           _useHd = value;
@@ -142,6 +264,10 @@ class _ApodDetailView extends StatelessWidget {
     required this.selectedDate,
     required this.onPickDate,
     required this.useHd,
+    required this.isSaved,
+    required this.onToggleSave,
+    required this.savedApods,
+    required this.onOpenSavedApod,
     required this.onToggleHd,
   });
 
@@ -149,6 +275,10 @@ class _ApodDetailView extends StatelessWidget {
   final DateTime selectedDate;
   final Future<void> Function() onPickDate;
   final bool useHd;
+  final bool isSaved;
+  final Future<void> Function() onToggleSave;
+  final List<ApodData> savedApods;
+  final Future<void> Function(ApodData savedApod) onOpenSavedApod;
   final ValueChanged<bool> onToggleHd;
 
   @override
@@ -168,6 +298,10 @@ class _ApodDetailView extends StatelessWidget {
           selectedDate: selectedDate,
           onPickDate: onPickDate,
           useHd: useHd,
+          isSaved: isSaved,
+          onToggleSave: onToggleSave,
+          savedApods: savedApods,
+          onOpenSavedApod: onOpenSavedApod,
           onToggleHd: onToggleHd,
         );
 
@@ -439,6 +573,10 @@ class _DetailsPanel extends StatelessWidget {
     required this.selectedDate,
     required this.onPickDate,
     required this.useHd,
+    required this.isSaved,
+    required this.onToggleSave,
+    required this.savedApods,
+    required this.onOpenSavedApod,
     required this.onToggleHd,
   });
 
@@ -446,6 +584,10 @@ class _DetailsPanel extends StatelessWidget {
   final DateTime selectedDate;
   final Future<void> Function() onPickDate;
   final bool useHd;
+  final bool isSaved;
+  final Future<void> Function() onToggleSave;
+  final List<ApodData> savedApods;
+  final Future<void> Function(ApodData savedApod) onOpenSavedApod;
   final ValueChanged<bool> onToggleHd;
 
   @override
@@ -482,9 +624,15 @@ class _DetailsPanel extends StatelessWidget {
               const SizedBox(width: 8),
               if (apod.copyright != null)
                 Chip(
-                  label: Text('© ${apod.copyright}'),
+                  label: Text('(c) ${apod.copyright}'),
                 ),
             ],
+          ),
+          const SizedBox(height: 12),
+          FilledButton.icon(
+            onPressed: onToggleSave,
+            icon: Icon(isSaved ? Icons.bookmark_remove : Icons.bookmark_add),
+            label: Text(isSaved ? 'Unsave day' : 'Save day'),
           ),
           const SizedBox(height: 16),
           SwitchListTile.adaptive(
@@ -498,6 +646,54 @@ class _DetailsPanel extends StatelessWidget {
             apod.explanation,
             style: theme.textTheme.bodyLarge?.copyWith(height: 1.5),
           ),
+          const SizedBox(height: 24),
+          Text(
+            'Saved days',
+            style: theme.textTheme.titleMedium,
+          ),
+          const SizedBox(height: 8),
+          if (savedApods.isEmpty)
+            Text(
+              'No saved days yet.',
+              style: theme.textTheme.bodyMedium,
+            )
+          else
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 260),
+              child: ListView.separated(
+                itemCount: savedApods.length,
+                separatorBuilder: (context, index) => const SizedBox(height: 8),
+                itemBuilder: (context, index) {
+                  final ApodData savedApod = savedApods[index];
+                  final DateTime? savedDate = DateTime.tryParse(savedApod.date);
+                  final bool isCurrentDay = savedApod.date == apod.date;
+
+                  return Card(
+                    elevation: 0,
+                    color: isCurrentDay
+                        ? theme.colorScheme.primaryContainer
+                        : theme.colorScheme.surfaceContainerHighest.withOpacity(0.35),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: ListTile(
+                      onTap: () => onOpenSavedApod(savedApod),
+                      title: Text(
+                        savedApod.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      subtitle: Text(
+                        savedDate == null
+                            ? savedApod.date
+                            : DateFormat('MMM d, yyyy').format(savedDate),
+                      ),
+                      trailing: const Icon(Icons.open_in_new),
+                    ),
+                  );
+                },
+              ),
+            ),
         ],
       ),
     );
@@ -566,8 +762,21 @@ class ApodData {
     );
   }
 
+  Map<String, dynamic> toJson() {
+    return <String, dynamic>{
+      'title': title,
+      'explanation': explanation,
+      'url': url,
+      'media_type': mediaType,
+      'date': date,
+      'hdurl': hdUrl,
+      'copyright': copyright,
+    };
+  }
+
   String imageUrl(bool useHd) {
     if (!useHd) return url;
     return hdUrl ?? url;
   }
 }
+
