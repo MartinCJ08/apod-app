@@ -35,7 +35,10 @@ class ApodHomePage extends StatefulWidget {
 }
 
 class _ApodHomePageState extends State<ApodHomePage> {
-  static const String _apiKey = '';
+  static const String _apiKey = String.fromEnvironment(
+    'API_KEY',
+    defaultValue: '',
+  );
   static const String _savedApodsKey = 'saved_apods';
   final DateFormat _dateFormat = DateFormat('yyyy-MM-dd');
 

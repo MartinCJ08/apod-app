@@ -9,5 +9,6 @@ A Flutter (web + mobile) client for NASA's Astronomy Picture of the Day (APOD) A
 - HD image toggle when available
 
 ## Notes
-- Uses NASA's `DEMO_KEY`. For higher rate limits, replace the key in `lib/main.dart`.
-- This repo is intentionally lightweight and does **not** install Flutter. If you already have Flutter installed, the usual `flutter pub get` and `flutter run -d chrome` will work.
+- Uses NASA's `API_KEY` dart define.
+- This repo is intentionally lightweight and does **not** install Flutter. If you already have Flutter installed, the usual `flutter pub get` and `flutter run --dart-define=API_KEY=your_api_key_here -d chrome` will work.
+- Build for production: `flutter build appbundle --dart-define=API_KEY=your_production_key`
