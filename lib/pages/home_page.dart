@@ -237,7 +237,7 @@ class _ApodHomePageState extends State<ApodHomePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Astronomy Picture of the Day'),
+        title: const Text('APOD'),
         actions: [
           IconButton(
             onPressed: _isLoading ? null : _loadRandomApod,
