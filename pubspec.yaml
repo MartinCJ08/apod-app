@@ -1,7 +1,7 @@
 ﻿name: apod_app
-description: NASA APOD viewer (Flutter web + mobile).
+description: NASA Astronomy Picture of the Day viewer.
 publish_to: "none"
-version: 0.1.0
+version: 1.0.0
 
 environment:
   sdk: ">=3.3.0 <4.0.0"
@@ -19,6 +19,9 @@ flutter:
   uses-material-design: true
   assets:
     - assets/images/
+flutter_launcher_icons:
+  android: true
+  image_path: "assets/images/icon.png"
 flutter_native_splash:
   color: "#0B1023"
   image: assets/images/splash_logo.png
@@ -28,3 +31,5 @@ flutter_native_splash:
     color: "#0B1023"
 
   web: true
+dev_dependencies:
+  flutter_launcher_icons: ^0.14.4
