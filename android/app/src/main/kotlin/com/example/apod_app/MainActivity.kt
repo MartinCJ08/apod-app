@@ -1,4 +1,4 @@
-package com.example.apod_app
+package com.barranca.labs.apod_app
 
 import io.flutter.embedding.android.FlutterActivity
 
